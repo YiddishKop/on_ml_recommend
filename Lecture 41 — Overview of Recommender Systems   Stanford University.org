@@ -1,0 +1,957 @@
+#+TITLE: Lecture 41 — Overview of Recommender Systems   Stanford University
+
+NOTE: The content of this note is about the course <Mining of Massive Datasets>
+from lecture 41 to lecture 45
+
+
+* Overview
+
+User don't really know what they are looking for this is where recommendations
+coming from.
+
+这个系列总共讲几个内容:
+
+1. Content-based system
+2. Collaborative Filtering
+3. Evaluating Recommender Systems
+
+
+
+- 长尾理论, 线上线下
+
+
+Formal Model
+
+C = sett of Customers
+S = sett of Items
+
+
+Utility function ~u: C X S -> R~
+
+
+- R = sett of ratings
+- R is a totally ordered set
+- e.g. 0-5 stars, real number in [0, 1]
+
+
+Utility matrix
+
+
+|       | Avatar | LOTR | Matrix | Pirates |
+|-------+--------+------+--------+---------|
+| Alice |      1 |      |    0.2 |         |
+| Bob   |        |  0.5 |        |     0.3 |
+| Carol |    0.2 |      |      1 |         |
+| David |        |      |        |     0.4 |
+
+
+The key problem of recommendations system is to fill the null value of the
+Utility Matrix.
+
+这包含如下几个问题:
+
+1. Gathering "known" ratings for matrix()
+   1. How to collect the data in the utility matrix
+2. Extrapolate unknown ratings from the known ones
+   1. mainly interested in high unknown ratings
+   2. we are not interested in knowing what you don't like but what you like
+3. Evaluating extrapolation methods
+   1. How to measure success/performance of recommendation methods.
+
+
+Gathering Ratings
+
+
+Explicit way:
+1. Ask people to rate items.
+2. Doesn't scale: only a small fraction of users leave raings and reviews.
+
+
+Implict way:
+1. Learn ratings from user actions.
+
+    e.g. *purchase implies high rating*
+
+2. What about low ratings.
+
+   implict way 很那去学习用户不喜欢的, 你没有什么比较好的指标来 implies low
+   rating.
+
+
+
+Extrapolateing Utilities
+
+
+1. Key problem: matrix *U* is *sparse*.
+
+   most people have not rated most items.
+
+2. Cold start problem:
+   1. new items have no ratings.
+   2. new users have no history.
+
+Three approaches to recommender systems
+1. Content based
+2. Collaborative filters
+3. Latent factor based
+
+* Content based systems
+
+*Main idea*
+
+Recommend items to customer *x*, *similar* to previous items rated highly by
+*x*.
+
+
+Examples:
+1. Movies
+
+   Same actor, director, genre...
+
+2. Websites, blogs, news
+
+   Articles with *similar* content
+
+3. People
+
+   Recommend people with many common friends.
+
+
+
+*Item Profiles*
+
+For each item, create an *item profile*, which we can then use to build *user
+profiles*. So the profile is a *sett of features* about the item.
+
+- Movies: author, title, actor, director, ...
+- Images: videos: metadata and tags
+- People: Set of friends.
+
+
+Convenient to think of the *item profile* as a *vector*:
+
+- One entry per feature(eg. each actor, director)
+- Vector might be boolean or real-valued.
+
+
+Text features: <- 从文本挖掘中获取经验
+
+Profile = sett of "important" words in item(document)
+
+How to pick important words!
+
+Usual heuristic from text mining is TF-IDF (~Term frequency * Inverse Doc
+Frequence~)
+
+
+
+
+Sidenote: TF-IDF
+
+TF-IDF 把 *具体的东西抽象化(向量化)* 的方法, 用 *独特且多次* 的 *要素* 代表 *整体*.
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-06 23:19:54
+[[file:Content based systems/screenshot_2018-12-06_23-19-54.png]]
+
+
+- fij = frequency of term(feature) i in doc(item) j
+- i --- apple,
+- j --- a passage.
+- f_{ij} 就是这个 apple 出现在 *这篇文章* 中的次数,
+- max_{k}f_{kj} 就是这 apple 出现在 *所有文章中* 次数最高的次数.
+
+
+TFij 整体就是在说, 这个单词 i 在这个文章 j 中出现的(相对) *次数* 到底多不多.
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-06 23:24:05
+[[file:Content based systems/screenshot_2018-12-06_23-24-05.png]]
+
+- ni = number of docs that mention item i
+- N = total number of docs
+
+
+IDFi 就是在说这个单词 i 是否是足够 *独特*.
+
+
+TF-IDF score: wij = TFij * IDFi
+
+Doc(or item) profile = *set* of words(feature) with *highest TF-IDF scores*,
+together with their *scores*.
+
+
+
+User Profiles
+
+User has rated *items* with profiles ~i_i, ..., i_n~. (items like the document
+refer below, so they are all vectors.)
+
+
+1. Simple way:
+
+有了这些向量之后,如何构建这个用户的 profile 呢. 最简单的就是把取平均: ~(i1 +
+i2 + ... +in)/n~ 但这个没有考虑到用户的喜好, 直接取平均, 于是可以使用 weighed
+average.
+
+
+2. Variant way:
+
+Normalize weights using average rating of user.
+
+
+3. More sophisticated aggregations possible:
+
+
+Example1: Boolean Utility Matrix
+
+Items are movies, only feature is "Actor"
+
+
+
+Making Predictions
+
+
+User profile *x*, Item profile *i*.
+
+Estimate $U(x,i)=cos(\theta)=\frac{(x\cdot{i})}{|x||i|}$ , by cosie similarity.
+
+Then recommend the item with high ~U(x,i)~ value, in the catalog to this user.
+
+#+BEGIN_QUOTE
+Technically, the cosine distance is actually the angle $\theta$, and cosine
+similarity is the angle 180-$\theta$
+#+END_QUOTE
+
+
+如何保证, user profile 与 item profile 是同一个维度的向量呢.
+
+#+BEGIN_EXAMPLE
+TF-IDF -----find top k feature-----> item profile --- \
+                              -----> item profile --- |
+                              -----> item profile --- | ---> average ---> user profile
+                              ...                     |
+                              -----> item profile --- /
+#+END_EXAMPLE
+
+
+以上这些就是 COntent based method.
+
+pros:
+
+1. No need for data on other users.(你不需要其他用户的数据来给这个用户做推荐.)
+
+2. Able to recommend to users with unique tastes.
+
+   when you get to collaborative filtering, you'll see that CF make
+   recommendations to one user by other similar users. 协同过滤的问题就是如果某
+   些用户的爱好很独特, 与他相似的用户很少或不存在, 那么协同过滤就会失效. Content
+   based 方法是直接结算 用户与商品之间的相似度,不需要仰赖其他用户的相似度.
+
+3. Able to recommend new & unpopular items.
+
+   - No first-rater problem: 一个新商品进来, 他没有任何人的分数. 这也是
+     content-based 的有点,他不需要别的用户对这个商品的打分, the entirely on the
+     features of the items are not on how other users rated the item.
+
+4. explanations for recommended items
+
+
+
+Cons:
+
+1. finding the appropriate feature is hard.
+
+2. Overspecialization
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-07 06:38:53
+[[file:Content based systems/screenshot_2018-12-07_06-38-53.png]]
+
+
+3. Cold-start problem for new users.
+
+   How to build a user profile
+
+
+* Collaborative Filtering
+
+Consider user *X*
+
+
+Find sett N of other users whose ratings are "similar" to *X* 's ratings.
+
+
+Estimate *X* 's ratings based on ratings of users in *N*.
+
+
+[[file:Collaborative Filtering/screenshot_2018-12-07_22-29-15.png]]
+
+
+This is the key trick hide in the Collaborative Filtering method, that's *find a
+set of users similar to this user*. 这些与'我'相似的用户们就可以称为'我'的
+neighbor hood.
+
+想要找到 '相似用户---neighbor hood' 我们就得先定义 '何为相似'.
+
+1. Consider users x and y with rating vectors ~rx~ and ~ry~.
+2. We need a similarity metric ~sim(x,y)~.
+3. Capture intuition that ~sim(A,B)~ > ~sim(A,C)~
+
+** Similarity
+
+*Option 1: Jaccard Similarity*
+
+|   | HP1 | HP1 | HP1 | TW | SW1 | SW2 | SW3 |
+|---+-----+-----+-----+----+-----+-----+-----|
+| A |   4 |     |     |  5 |   1 |     |     |
+| B |   5 |   5 |   4 |    |     |     |     |
+| C |     |     |     |  2 |   4 |   5 |     |
+| D |     |   3 |     |    |     |     | 3   |
+
+
+$$
+sim(A,B) = \frac{|r_A \cap r_B|}{|r_A \cup r_B|}
+$$
+
+A,B 两个用户的相似度度量, 可以使用两者 *都评价过的* 商品数量, 除以两者 *评价过
+的* 商品数量来表示.
+
+$sim(A,B)=1/5; sim(A,C)=2/4$
+
+由此我们得出
+
+$sim(A,B) < sim(A,C)$
+
+但是我们发现,
+
+- 用户 A 与用户 B *都评价过的商品* 数量为 1, 但是评分 *很接近*;
+- 用户 A 与用户 C *都评价过的商品* 数量为 2, 但是评分 *很不一样*.
+
+
+*缺陷*:
+
+我们估计 A与B 的相似度更高, A与C 的相似度更低. 但经过 Jaccard Similarity 的计算
+结果却完全相反. 这体现出 Jaccard Similarity 的一个确定, *根本没有考虑评分* 只是
+考虑了 *共同评价过的商品数量*
+
+
+
+*Option 2: Cosine similarity*
+
+
+|   | HP1 | HP1 | HP1 | TW | SW1 | SW2 | SW3 |
+|---+-----+-----+-----+----+-----+-----+-----|
+| A |   4 |     |     |  5 |   1 |     |     |
+| B |   5 |   5 |   4 |    |     |     |     |
+| C |     |     |     |  2 |   4 |   5 |     |
+| D |     |   3 |     |    |     |     | 3   |
+
+Cosine similarity 需要使用向量, 这里要对所有没评价过的商品进行 *置0* 处理, 也就
+是 *每购买过的商品用户对其默认评价值为0*
+
+|   | HP1 | HP1 | HP1 | TW | SW1 | SW2 | SW3 |
+|---+-----+-----+-----+----+-----+-----+-----|
+| A |   4 |   0 |   0 |  5 |   1 |   0 |   0 |
+| B |   5 |   5 |   4 |  0 |   0 |   0 |   0 |
+| C |   0 |   0 |   0 |  2 |   4 |   5 |   0 |
+| D |   0 |   3 |   0 |  0 |   0 |   0 |   3 |
+
+
+$$
+sim(A,B) = cos(r_A, r_B)
+$$
+
+
+$sim(A,B)=0.38; sim(A,C)=0.32$
+
+
+虽然 A与B 相似度比 A与C 高, 但只高一点点, 这也不符合我们对两者评分差异巨大的认知.
+
+
+*缺陷*:
+
+treats missing ratings as negative. ~0~ 这里很明显是负面评价, 这显然不合理, *没
+购买* 过的商品评价都是 *负面* 的.
+
+
+*Option 3: Centered cosine*
+
+Normalize ratings by substracting row mean.
+
+
+|   | HP1 | HP2 | HP3 | TW | SW1 | SW2 | SW3 |
+|---+-----+-----+-----+----+-----+-----+-----|
+| A |   4 |     |     |  5 |   1 |     |     |
+| B |   5 |   5 |   4 |    |     |     |     |
+| C |     |     |     |  2 |   4 |   5 |     |
+| D |     |   3 |     |    |     |     | 3   |
+
+
+Centered cosine 也是把没有评价过的填0, 最后也是利用 Cosine similarity, 但是多了
+一步操作 *对已经给过的评价分数做 normalize*: 把已经有过评价的放在一起取一个均值,
+然后已经有过评价的减去这个均值得到新的已经有值的部分.
+
+1. computing average row-wise only by items that have values in that row:
+
+   $avg(A) = \frac{(HP1 + TW + SW1)}{3} = 10/3$
+
+2. subtract all items of each row that have values by each row's computed
+   average
+
+   $A_{new}=[4-10/3, 0, 0, 5-10/3, 1-10/3, 0, 0]$
+
+3. fill the empty items by 0.
+
+
+|   | HP1 | HP1 |  HP1 | TW   | SW1  | SW2 | SW3 |
+|---+-----+-----+------+------+------+-----+-----|
+| A | 2/3 |   0 |    0 | 5/3  | -7/3 |   0 |   0 |
+| B | 1/3 | 1/3 | -2/3 | 0    | 0    |   0 |   0 |
+| C | 0   |   0 |    0 | -5/3 | 1/3  | 4/3 |   0 |
+| D | 0   |   0 |    0 | 0    | 0    |   0 |   0 |
+
+
+*最后我们再来计算 cosine similarity*:
+
+$$
+sim(A,B)=cos(r_A,r_B)=0.09; \
+sim(A,C)=-0.56
+$$
+
+sim(A,B) > sim(A,C)
+
+为什么这种 Centered Cosine 足够好, 因为我们这种方法默认的 "填0", 这个 0 是每一行
+的平均值. *Option 2 中我们默认 "填的0" 是负面评价分, Option 3 中是中性评价分*.
+
+[Note] Cosine Similarity also called "Pearson Correlation".
+
+** Rating Predictions
+
+经过前面的步骤:
+
+Sparse Utility Matrix ---> Centered Normalization ---> New Utility Matrix --> Cosine Similarity
+
+我们可以计算用户(行)两两之间的相似度了, 现在我们就需要利用这个相似度来进行预测,
+注意:前面我们更新过一次 utility matrix, 那个不是预测步骤, 那仅仅是一种预处理
+(preprocession), 这个预处理的步骤是让 similarity 更合理.
+
+
+下面需要引入 *邻域* (neighbor hood)的概念, *邻域* 是机器学习尤其是非监督机器学习
+中常用的概念, 目的是通过 *近朱者赤近墨者黑* 的原则来进行判断. 如何确定某个点(本
+质是向量,现实意义能是用户,也可能是商品)的 *邻域* 呢, 就是通过 *相似度*: 相似度越
+高 "邻" 的越近; 相似度越低 "邻" 的越远.
+
+
+[[file:Collaborative Filtering/screenshot_2018-12-08_16-09-52.png]]
+
+如何由某个用户的邻域来预测该用户对某个商品的评价呢, 需要两步:
+
+1. 找到该用户的 *N邻域*: 从所有用户中找到与该用户最相似的 *N* 个用户;
+2. 找到邻域中评价了这个商品的 *k个用户*: 从 *N邻域中* 找到 *k个用户*;
+3. 预测该用户对这个商品的评分
+   1. Option 1: k个用户每人一票的比重,输出自己的评分,然后求和取平均.
+   2. Option 2: N个用户每人按照相似度的比重,输出自己的评分,然后求和,然后除以总相
+      似度总和(类似: $\bar{x} = P(a_1)x_2 + P(a_2)x_2 + P(a_3)x_3$), 这里 P(a1)
+      毫无疑问就 "各自/总"
+
+** Item-Item Collaborative Filtering
+
+之前的这个过程我们是针对每个 *用户*,计算相似度,计算邻域. 这个过程我们也可以对 *
+*商品* 来进行. 针对 *用户* 和针对 *商品* 可以算作是 *对偶操作*. 所以我们完全可以
+使用同一个 utility matrix, 同一种预测函数 *weighted average of ratings by
+similarity weight*. 一个按行计算, 一个按列计算.
+
+
+|   | HP1 | HP1 |  HP1 | TW   | SW1  | SW2 | SW3 |
+|---+-----+-----+------+------+------+-----+-----|
+| A | 2/3 |   0 |    0 | 5/3  | -7/3 |   0 |   0 |
+| B | 1/3 | 1/3 | -2/3 | 0    | 0    |   0 |   0 |
+| C | 0   |   0 |    0 | -5/3 | 1/3  | 4/3 |   0 |
+| D | 0   |   0 |    0 | 0    | 0    |   0 |   0 |
+
+
+User-User CF:
+
+$$
+r_{xi} = \frac{\sum_{y\in{N}}s_{xy}\cdot{r_{yi}}}{\sum_{y\in{N}}s_{xy}}
+$$
+
+
+
+|     |    A |    B |    C | D |
+|-----+------+------+------+---|
+| HP1 |  2/3 |  1/3 |    0 | 0 |
+| HP1 |    0 |  1/3 |    0 | 0 |
+| HP1 |    0 | -2/3 |    0 | 0 |
+| TW  |  5/3 |    0 | -5/3 | 0 |
+| SW1 | -7/3 |    0 |  1/3 | 0 |
+| SW2 |    0 |    0 |  4/3 | 0 |
+| SW3 |    0 |    0 |    0 | 0 |
+
+Item-Item CF:
+
+$$
+r_{xi} = \frac{\sum_{j\in{N(i;x)}}s_{ij}\cdot{r_{xi}}}{\sum_{j\in{N(i;x)}}s_{ij}}
+$$
+
+1. $s_{ij}$: similarity of items i and j
+1. $r_{xj}$: rating of user x on item j
+1. $N(i;x)$: sett items rated by x similar to i
+
+
+公式中最令人迷惑的是对某个用户的多个商品取相似度, 这个就是对偶操作, 通过上面的表
+格, 对照 User-User CF 公式一目了然.
+
+** Item-Iterm Example
+
+取邻域个数: |N| = 2
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 18:06:50
+[[file:Collaborative Filtering/screenshot_2018-12-08_18-06-50.png]]
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 18:07:04
+[[file:Collaborative Filtering/screenshot_2018-12-08_18-07-04.png]]
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 18:08:04
+[[file:Collaborative Filtering/screenshot_2018-12-08_18-08-04.png]]
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 18:09:18
+[[file:Collaborative Filtering/screenshot_2018-12-08_18-09-18.png]]
+
+** Iterm-Iterm vs. User-User
+
+虽然两者理论上是 *对偶* 的, 但实际使用上 *Iterm-Iterm* 的效果大部分情况下都要好
+于 *User-User*.
+
+大概意思是说, *用户的喜好会随时间发生变化*, 两个相似的人过两年就不相似了, 但是 *
+*商品* 的属性 *相对固定*.
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 18:15:02
+[[file:Collaborative Filtering/screenshot_2018-12-08_18-15-02.png]]
+
+
+   User2User CF 类似两个用户的交叉比对, 所以经常可以推荐令人意想不到的产品, 而且
+   有历史商品记录做相似度匹配来打底, 不会天马行空的乱推荐. 所以这种协同过滤非常
+   适合大型数据集, 增加商品多样性及曝光率, 缺点是人的性格会印象购物, 而性格会随
+   着时间空间而改变, 过去2年相似的人,也会渐渐变的不相似, 如果每个月都要重新计算3
+   亿用户的相似度这是不现实的计算量.
+
+
+   Item2Item 是依据商品的相似度来推荐, 最极端的情况就是你购买冰箱他会再给你推荐
+   冰箱, 他适合小型数据集, 而且商品的属性相对稳定, 计算一次相似度基本就可以一直
+   用, 推荐系统也稳定.
+
+* Implementing Collaborative Filtering(Advanced)
+
+
+目前协同过滤的过程是:
+
+1. build sparse primitive utility matrix;
+2. apply *centered normalization* row-wise;
+3. compute *cosine similarities* of one *row* to rest rows to find top k
+   neighbors;
+4. predicting value of the null item by weighted average of neighbor hood value
+   of certain *column*, weighted by *similarity*.
+
+
+*Collaborative Filtering: Complexity*
+
+协同过滤中最耗时耗内存的操作就是 *寻找邻域*, 因为要找到 top k 相似度邻居, 就要计
+算这一行与其他所有行的相似度,把相似度计算当做原子操作,这一步复杂度是行数. 向量之
+间的余弦相似度就是内积除以模的乘积, 其复杂度为向量长度, 也就是列数. 那么整体来看,
+对 *某一行* 寻找其 *寻找邻域* 的算法复杂度为整个矩阵的"面积", 也就是 size of
+utility matrix.
+
+
+因为我们的最终目的是要给矩阵填值, 对于任何一个缺值的位置, 要填他就需要 top k 取
+weighted average of column, 要得到 top k 就需要计算一次该行对其他所有行的相似度.
+而我们的矩阵是特别稀疏的矩阵, 每一行都有缺值. 所以这里总体的相似度计算量就是 *矩
+阵行数*矩阵面积*.
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-08 20:01:22
+[[file:Implementing Collaborative Filtering(Advanced)/screenshot_2018-12-08_20-01-22.png]]
+
+1. Near-neighbor search in high dimensions(LSH):locality sensitive hashing
+
+   take an item and quickly find a sett of new neighbors to that item.
+
+2. Clustering
+
+   use clustering to group users and items into smaller clusters and thereby
+   speed up the process by restricting the search to within a cluster as opposed
+   to into in the entire sett of items.
+
+3. Dimension reduction(comming soon)
+
+
+
+
+
+
+** Pros/Cons of Collaborative Filtering
+
+
+Pros: 不需要做特征选择;
+
+Cons:
+
+1. 冷启动(cold start): 协同过滤能够work的一个前提条件是: 足够的用户,评价了足够的商品. 协 同
+   过滤是给一个商品or用户, 我们提取出一个相似集.如果没有足够的数据, 很难找到合适
+   的相似用户.
+
+2. 稀疏(sparsity): utility matrix 是非常非常非常非常稀疏的, 就像星星之于宇宙. 如何找到其他
+   也评价了某个相同商品的用户, 是一个非常麻烦的问题, 10亿商品 2亿用户 的搜索量.
+
+3. 第一个评价用户问题(first rater): 一个新的商品进来, 每人评价他, 那么他那一整行
+   都是 null (所有用户对其评价都是 null), 该行的 centered normalization 是 0, 该
+   行与其他所有行的 cosine 相似度也是0(没有 top-k). weighted average by
+   similarity 也是 0. 也就是 *不会给任何用户推荐*.
+
+
+   |     |    A |    B |    C | D | Similarity |
+   |-----+------+------+------+---+------------|
+   | HP1 |  2/3 |  1/3 |    0 | 0 |          0 |
+   | HP1 |    0 |  1/3 |    0 | 0 |          0 |
+   | HP1 |    0 | -2/3 |    0 | 0 |          0 |
+   | TW  |  5/3 |    0 | -5/3 | 0 |          0 |
+   | SW1 | -7/3 |    0 |  1/3 | 0 |          0 |
+   | SW2 |    0 |    0 |  4/3 | 0 |          0 |
+   | SW3 |    0 |    0 |    0 | 0 |       <--- |
+
+   对于那些很小众的商品, 知道的人就很少, 去给他打分的人也很少, 喜欢的人就更少,
+   这样的商品去按行计算相似度的时候, 所有商品与他的相似度都特别低, 取 top k 个商
+   品, 相似度都是 1/1000 级别的. 然后用相似度加权得到的平均分作为预测值, 这个值
+   毫无疑问也会特别低. 那最终就是也 *不会给任何人推荐*.
+
+   |     | A    |    B |    C | D | Similarity |
+   |-----+------+------+------+---+------------|
+   | HP1 | 2/3  |  1/3 |    0 | 0 |      0.001 |
+   | HP2 | 0    |  1/3 |    0 | 0 |      0.001 |
+   | HP3 | 0    | -2/3 |    0 | 0 |      0.001 |
+   | TW  | 5/3  |    0 | -5/3 | 0 |      0.001 |
+   | SW1 | -7/3 |    0 |  1/3 | 0 |      0.001 |
+   | SW2 | 0    |    0 |  4/3 | 0 |      0.001 |
+   | SW3 | 4/3  |    0 |    0 | 0 |       <--- |
+
+4. 过于重视流行商品的推荐(Popularity bias): 协同过滤倾向于推荐特别流行的商品, 因
+   为流行商品比如哈利波特所有人都好评,不知道的跟风的也跟着好评, 那么这种情况下计
+   算相似度, *他就跟所有其他商品都"像"*, 所有其他商品的 top k 邻域中都有他的身影,
+   这时候我们对某个没看哈利波特的用户推荐的时候, 他的相似度高
+
+
+   |    | A | B | C |   D | E | F | G   | H |  I | J |   K | L |  M | N | O   | P | Q | R | similarity |
+   |----+---+---+---+-----+---+---+-----+---+----+---+-----+---+----+---+-----+---+---+---+------------|
+   | HP | 3 | 3 | 3 | ___ | 3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 | 3 | 3 |         <- |
+   | TW |   |   | 1 |   4 |   | 2 |     |   |    |   |     |   |    |   |     |   |   |   |          9 |
+   | HZ |   |   |   |     |   |   |     |   | -1 |   |     |   |  2 |   |     |   |   |   |          3 |
+   | SW |   |   |   |     |   |   |     |   |    |   |  -2 |   |    |   |     |   |   |   |          0 |
+   | KR |   |   |   |     |   |   |     |   |    |   |   1 |   |    | 3 |     |   |   |   |          3 |
+   | SX |   |   |   |     |   |   |     |   |    |   |   3 |   | -1 |   |     | 2 |   |   |          3 |
+   | SD |   |   |   |     |   |   |     |   |    |   |  -2 |   | -2 |   |     |   |   | 1 |         -3 |
+   | UI |   |   |   |   1 |   | 2 | 3   |   |    |   |     |   |    |   |     |   |   |   |          6 |
+
+
+
+   |    | A | B | C |   D | E | F | G   | H |  I | J |   K | L |  M | N | O   | P | Q | R | similarity |
+   |----+---+---+---+-----+---+---+-----+---+----+---+-----+---+----+---+-----+---+---+---+------------|
+   | HP | 3 | 3 | 3 | ___ | 3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 | 3 | 3 |          9 |
+   | TW |   |   | 1 |   4 |   | 2 |     |   |    |   |     |   |    |   |     |   |   |   |         <- |
+   | HZ |   |   |   |     |   |   |     |   | -1 |   |     |   |  2 |   |     |   |   |   |          0 |
+   | SW |   |   |   |     |   |   |     |   |    |   |  -2 |   |    |   |     |   |   |   |          0 |
+   | KR |   |   |   |     |   |   |     |   |    |   |   1 |   |    | 3 |     |   |   |   |          0 |
+   | SX |   |   |   |     |   |   |     |   |    |   |   3 |   | -1 |   |     | 2 |   |   |          0 |
+   | SD |   |   |   |     |   |   |     |   |    |   |  -2 |   | -2 |   |     |   |   | 1 |          0 |
+   | UI |   |   |   |   1 |   | 2 | 3   |   |    |   |     |   |    |   |     |   |   |   |          4 |
+
+   |    | A | B | C |   D | E | F | G   | H |  I | J |   K | L |  M | N | O   | P | Q | R | similarity |
+   |----+---+---+---+-----+---+---+-----+---+----+---+-----+---+----+---+-----+---+---+---+------------|
+   | HP | 3 | 3 | 3 | ___ | 3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 |  3 | 3 | ___ | 3 | 3 | 3 |          3 |
+   | TW |   |   | 1 |   4 |   | 2 |     |   |    |   |     |   |    |   |     |   |   |   |          0 |
+   | HZ |   |   |   |     |   |   |     |   | -1 |   |     |   |  2 |   |     |   |   |   |         <- |
+   | SW |   |   |   |     |   |   |     |   |    |   |  -2 |   |    |   |     |   |   |   |          0 |
+   | KR |   |   |   |     |   |   |     |   |    |   |   1 |   |    | 3 |     |   |   |   |          0 |
+   | SX |   |   |   |     |   |   |     |   |    |   |   3 |   | -1 |   |     | 2 |   |   |         -2 |
+   | SD |   |   |   |     |   |   |     |   |    |   |  -2 |   | -2 |   |     |   |   | 1 |         -4 |
+   | UI |   |   |   |   1 |   | 2 | 3   |   |    |   |     |   |    |   |     |   |   |   |          0 |
+
+
+   1. 由于稀疏性, 每本书与哈利波特的相似度都很高,因为其他书的向量都是稀疏的, 哈
+      利波特的向量是满的.
+   2. 计算该本书的 predicting rating 的时候, 他一定比同列的哈利波特要小, 因为
+      $r_{xi} =
+      \frac{\sum_{j\in{N(i;x)}}s_{ij}\cdot{r_{xj}}}{\sum_{j\in{N(i;x)}}s_{ij}}$.
+      比如这里 $(A,TW)=\frac{9*3}{9+4}<\frac{9*3}{9}=3=(A,HP)$
+
+
+   [[https://glinden.blogspot.com/2006/03/early-amazon-similarities.html][HarryPotter problem-1]]
+
+   [[https://nkparimi.blogspot.com/2010/01/harry-potter-problem.html][HarryPotter problem-2]]
+
+   [[https://www.quora.com/Recommendation-Systems-What-exactly-is-Harry-Potter-Problem][HarryPotter problem-3]]
+
+
+
+
+   #+BEGIN_QUOTE
+   Harry Potter in the "Harry Potter problem" refers to any item that is very
+   popular. With a item-based collaborative filtering approach, such as Amazon's
+   "People who bought this also bought", the system runs the risk of
+   recommending Harry Potter to everyone just because most people have bought
+   the harry potter book.
+
+   Thus, a good recommendation model will need to have some sense of importance,
+   or exclusivity of the connection between two items. For example, you could
+   compare the number of common users between an item and a candidate
+   recommendation item, normalized by the common users between the candidate
+   item and other items.
+
+   This is very similar to tf-idf frequency (tf–idf) in information retrieval.
+   For instance, a harry potter problem in search would mean associating common
+   words like "think", "say" (which are found in all documents) to a document
+   expressing some opinion.
+
+   A quick Google search will give you these:
+   1. The Harry Potter problem
+   2. Early Amazon: Similarities
+   #+END_QUOTE
+
+** Hybrid Methods
+
+   Have seen so many difficulties in CF, we can design hybrid methods to
+   overcome those.
+
+   we can add content-based methods to CF, means we can add *item profile* to
+   deal with a new item problem.
+
+   cold start
+   first rater
+   sparsity
+   popularity bias
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 01:20:02
+[[file:Implementing Collaborative Filtering(Advanced)/screenshot_2018-12-09_01-20-02.png]]
+
+*** Global Baseline Estimate
+
+    [问题]: 估计罗伊对 <The Sixth Sense> 的打分. 已知罗伊没有对任何与 <The Sixth
+    Sense> 相似的商品打过分. 这个问题就是 sparsity of utility matrix 所引起的问
+    题之一.
+
+    [解决步骤一]: 引入 *Global baseline approach*:
+
+    1. Mean movie rating, 所有用户给予所有电影的评分的均值.
+    2. 所有看过 <The sixth sense> 用户对该部电影的评分均值比所有用户对其他电影的
+       评分均值高多少.
+    3. 罗伊对看过的电影评分的均值比其他用户对看过的电影评分均值高多少.
+    4. Baseline estimate: ~(1) + (2) + (3)~
+
+
+
+    [解决步骤二]: *Combining Global Baseline with CF*
+
+    即便罗伊没有评价过与 <The sixth sense> 相似的电影, 但是依然可以瘸子里挑将军,
+    找到"最相似"的那 top k 部, 通过这些电影和 CF 算法来估算出罗伊会给 <The sixth
+    sense> 的评分.
+
+    #+BEGIN_QUOTE
+    我觉得除了 Iterm-Item CF 以外, 这里找这个电影的相似电影, 在 utility matrix
+    如此稀疏的情况下, CF 效果可能还不如 Content-based 方法.
+
+    通过 Content-Based 方法找到与 <The sixth sense> 具有相同导言/演员/编剧等的电
+    影(这些电影未必是 Item-Item CF 认为的相似电影), 观察罗伊对他们的评分, 比如找
+    到一部 <Signs> 与 <The sixth sense> 有相同的导演, 但是罗伊给他的打分是 "1".
+    #+END_QUOTE
+
+
+    [解决步骤三]: Final estimate
+
+    最后预测罗伊会给 <The sixth sense> 的分数是: 4 - 1 = 3
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 13:10:28
+[[file:Implementing Collaborative Filtering(Advanced)/screenshot_2018-12-09_13-10-28.png]]
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 13:22:26
+[[file:Implementing Collaborative Filtering(Advanced)/screenshot_2018-12-09_13-22-26.png]]
+
+
+Item-Item CF:
+
+$$
+r_{xi} = \frac{\sum_{j\in{N(i;x)}}s_{ij}\cdot{r_{xi}}}{\sum_{j\in{N(i;x)}}s_{ij}}
+$$
+
+Global based Item-Item CF:
+
+$$
+r_{xi} = b_{xi} + \frac{\sum_{j\in{N(i;x)}}s_{ij}\cdot{(r_{xj}-b_{xj})}}{\sum_{j\in{N(i;x)}}s_{ij}}
+$$
+
+$$
+b_{xi} = \mu + b_{x} + b_{i}
+$$
+
+- $\mu$ : overall mean movie rating
+- $b_x$ : rating deviation of user x = (avg.rating of user x) - mu
+- $b_i$ : rating deviation of moive i
+
+这个公式还有另一个写法, 更容易理解一些:
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 14:18:13
+[[file:Implementing Collaborative Filtering(Advanced)/screenshot_2018-12-09_14-18-13.png]]
+
+其实公式完全一样, 只是换了一种写法, 简单解释: 原始 Item-Item CF 公式是 *该用户的
+购买记录中与待估测商品的相似度较高的商品的评分来贡献待估测商品的评分*, 现在加上
+了 $\bar{r_a}$, 已经有了该用户对该商品的平均估测, 剩下的事情就是 *相似度较高的商
+品来给待估测商品贡献各自的偏差(deviation)*.
+
+* Evaluating Recommender System
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 14:28:59
+[[file:Evaluating Recommender System/screenshot_2018-12-09_14-28-59.png]]
+
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 14:34:17
+[[file:Evaluating Recommender System/screenshot_2018-12-09_14-34-17.png]]
+
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 15:40:19
+[[file:Evaluating Recommender System/screenshot_2018-12-09_15-40-19.png]]
+
+
+推荐系统仅仅用精度来衡量算法的好坏,也许会有问题:
+1. prediction diversity:
+
+   推荐缺乏广泛性, 给该用户的推荐的商品都差不多, 你买了个冰箱他给你还推冰箱.
+2. prediction context:
+
+   推荐无法感知用户时空环境的变化, 冬天买了羽绒服, 夏天还给你推荐羽绒服.
+3. order of prediction:
+
+   推荐只会根据商品的预测分多少来排序, 但是最感兴趣的, 可能并不是最急迫的.
+4. the problem of RMSE:
+
+   $$
+   RMSE = \sqrt{\frac{\sum_{(x,i)\in{T}}(r_{xi} - r^*_{xi})^2}{N}}
+   $$
+
+   看上面这个公式, 整体就是一个平方和, 但这个公式计算 $(5-4)^2$ 和 $((-1)-(-2))^2$
+   的结果是一样的, 也就是RMSE并不会区分高分值(用户喜欢)和低分值(用户讨厌), 他只关注
+   预测值和真实值之间的 *差距*. 这个RMSE公式在进行怎样一种指导呢 --- 他希望算法的 *
+   *预测与真实之间的差距越小越好*, 而真实的推荐系统中, 我们更关注的是 *评价分都比较
+   高的时候预测值与真实值之间的差距越小越好*, 因为这样的推荐用户才会去买, 分数比较
+   低的时候, 他反正不会买, 这个差距根本不重要.
+
+* 我的问题
+
+1. evaluation 发生在什么时候, 只是利用历史数据么, 那么现在产生的数据在什么时候用
+   来更新模型呢. 模型更新的周期是多少, 每次更新这个模型都是全量计算么, 仅仅因为
+   (10亿商品*3亿用户)中的 %1 就进行更新!!! 如果一定要等到 %3 才更新是否时间太长
+   模型已经失去时效性. 是不是 Item-Item CF 就不会存在这个问题呢(因为 Iterm 的属
+   性更稳定). 是否有可能存在实时更新, *这种互动的更新模式, 像极了 RL 的应用场景,
+   作为三期算法更新方向*.
+
+   必须强调 User Experiance 的重要性, 这个是用户入口, 用户不进入口就不可能有数据,
+   在这个过程中算法就不可能迭代, 就不可能或的更好的推荐. 所以, 所有的应用场景都
+   首先强调入口, 推荐系统只是"门"后面的内容. 所以, 推荐系统之所以称为系统, 是涵
+   盖 UI/交互/前端体验/后端体验, 在内的综合功能.
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-12-09 17:55:00
+[[file:我的问题/screenshot_2018-12-09_17-55-00.png]]
+
+
+
+
+* 参考文档
+
+#+BEGIN_QUOTE
+http://html.rhhz.net/buptjournal/html/20160205.htm
+
+
+https://arxiv.org/pdf/1409.2762.pdf
+
+
+http://www.inf.unibz.it/~ricci/papers/RecSys9-CR.pdf
+
+
+https://juejin.im/entry/58f4906fb123db632b426cca
+
+
+https://www.youtube.com/watch?v=eIJwplMTEFs
+
+Collaborative filtering, especially latent factor model, has been popularly used
+in personalized recommendation. Latent factor model aims to learn user and item
+latent factors from user-item historic behaviors. To apply it into real big data
+scenarios, efficiency becomes the first concern, including offline model
+training efficiency and online recommendation efficiency. In this paper, we
+propose a Distributed Collaborative Hashing (DCH) model which can significantly
+improve both efficiencies. Specifically, we first propose a distributed learning
+framework, following the state-of-the-art parameter server paradigm, to learn
+the offline collaborative model. Our model can be learnt efficiently by
+distributedly computing subgradients in minibatches on workers and updating
+model parameters on servers asynchronously. We then adopt hashing technique to
+speedup the online recommendation procedure. Recommendation can be quickly made
+through exploiting lookup hash tables. We conduct thorough experiments on two
+real large-scale datasets. The experimental results demonstrate that, comparing
+with the classic and state-of-the-art (distributed) latent factor models, DCH
+has comparable performance in terms of recommendation accuracy but has both fast
+convergence speed in offline model training procedure and realtime efficiency in
+online recommendation procedure. Furthermore, the encouraging performance of DCH
+is also shown for several real-world applications in Ant Financial.
+#+END_QUOTE
+
+[[https://blog.csdn.net/fanyao4144/article/details/78759931][Spark 调优策略]]
+
+
+[[https://zhuanlan.zhihu.com/p/34199375][Amazon推荐系统是如何做到的]]
+
+
+[[https://blog.csdn.net/aijiudu/article/details/75206590][Spark 处理大规模数据优化实例]]
+
+
+[[https://spark.apache.org/docs/latest/ml-collaborative-filtering.html][sparkMLLIB 协同过滤解释文档]]
+
+[[https://spark.apache.org/docs/latest/api/scala/index.html#org.apache.spark.ml.recommendation.ALS][sparkMLLIB ALS 算法API文档]]
+
+[[https://github.com/apache/spark/blob/v2.4.0/mllib/src/main/scala/org/apache/spark/ml/recommendation/ALS.scala][sparkMLLIB ALS 源码]]
+
+[[https://spark.apache.org/docs/1.2.2/ml-guide.html][sparkMLLIB 编程指南]]
+
+
+
+[[https://blog.csdn.net/heyc861221/article/details/80130338][Amazon 推荐系统20年变迁]]
+
+推荐阅读英文: Two Decades of Recommender Systems at Amazon.com
+
+
+[[https://blog.csdn.net/smfwuxiao/article/details/51246996][聚类是如何与协同过滤协作的]]
+
+
+
+各大电商推荐系统技术栈:
+
+
+[[https://www.leiphone.com/news/201803/nlG3d4sZnRvgAqg9.html][阿里盖坤团队深层树结构检索]]
+
+
+[[https://blog.csdn.net/jiangjiang_jian/article/details/80834157][推荐系统遇上深度学习]]
+
+
+
+推荐系统构建介绍文档
+
+
+[[https://www.klipfolio.com/blog/recommender-system][5 steps to setting up a recommender system]]
+
+
+[[https://jessesw.com/Rec-System/][A gentle introduction to recommender systems with implicit feedback]]

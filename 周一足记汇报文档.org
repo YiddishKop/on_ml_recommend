@@ -1,0 +1,91 @@
+#+TITLE: 周一足记汇报文档
+
+
+* 推荐思路
+
+整体思路：基于物品的 *协同过滤推荐itembase-CF*
+
+主要分三个模块：
+
+1. [ 离线部分 ], 离线部分计算出 *商品相似度表* ，用户的 *历史打分评价表* ，离线
+   的 *推荐表* ；
+2. [ 实时部分 ], 实时部分，接收实时流数据，处理成 user-item-rating，调用商品相似
+   度表，结合离线推荐表或者当前目标user的推荐商品的排序，得到目标user的粗排的商
+   品，再利用算法或者规则进行精排序，得到user-item-rank，落表到应用层展示；
+3. [ 冷启动 ], 冷启动，对没有行为或者第一次登陆的用户的推荐规则，单独生成表。
+
+* 一、离线部分：
+** 物品相似度计算：
+*** 1.1 商品数量：
+- 全量：10亿
+- 四级类目：13755
+- 品牌数：118903
+- 四级类目+品牌：916162
+- 难点：需要确定item的定义，具体是类目还是单品，单品要 *裁剪* ，不然计算量太大；
+  单纯类目，推荐的商品也需要再定义 *排序* 方法
+
+*** 1.2 用户历史商品打分表：
+    UserID-ItemID-Ranting 至少一个月内浏览，搜索，加车，未购的商品加权打分，取
+    topk个
+*** 1.3 商品相似度矩阵：
+     |       | Item1 | Item2 | Item3 |
+     |-------+-------+-------+-------|
+     | Item1 |       |   0.8 |   0.3 |
+     | Item2 |       |       |   0.5 |
+     | Item3 |       |       |       |
+
+*** 1.4商品相似度排序表：
+    itemID-rank1-rank2…rankN
+
+    每个商品取前topN个相似商品
+
+** 用户一周对商品打分和偏好计算：
+*** 2.1用户一周商品打分表
+
+    user-item-ranting 根据打分表取topk个商品排序得到
+
+*** 2.2用户一周商品偏好表
+    表结构：userID-item1-item2…itemK
+
+** 3离线推荐结果计算：
+   根据用户 *一周* 商品偏好表 *topk* 个商品关联物品相似度表，每个user推荐 *X* 个
+   item，得到离线推荐表， *每日* 更新
+
+*** 3.1离线推荐表：userID-rec1-rec2-rec3…recX
+
+* 二、实时部分
+** 召回阶段：
+
+根据实时流数据处理成user-item-rating(rating根据浏览搜索次数，时长，排序)关联离线
+一周商品打分表user-item-rating，加权(实时的比重大，离线小)更新新的rating关联商品
+相似度排序表，得到实时推荐商品粗排序打分表userID-ItemID-rating(离线+实时)
+
+** 排序阶段：
+
+对粗排序打分表进行精准排序，得到实时推荐商品表userID-rec1-rec2-rec3…recX方法：
+LR或者简单逻辑
+
+** 实时推荐商品更新
+
+* 三、冷启动：
+主要是对无行为和第一次登陆的用户推荐X商品离线处理，表结构user-
+rec1-rec2-rec3…recX逻辑
+
+1. 根据实时推荐表计算当前推荐商品的最热商品TopX
+2. 根据历史销量计算热销商品TopX
+3. 根据历史搜索浏览计算最热商品TopX
+
+* 问题
+
+** Sparsity storage matters!
+
+Unlike dense matrices, many different ways to store a sparse matrix
+- COO — coordinate list
+- CSR — compressed sparse row
+- CSC — compressed sparse column
+
+
+** Spark RDD 问题
+
+1. [[http://pengshuang.space/2017/08/22/Spark%25E4%25B8%25BA%25E4%25BB%2580%25E4%25B9%2588%25E6%259C%2589%25E6%2597%25B6%25E5%2580%2599%25E4%25B8%258D%25E9%2580%2582%25E5%2590%2588%25E5%2581%259A%25E5%25A4%25A7%25E8%25A7%2584%25E6%25A8%25A1%25E6%259C%25BA%25E5%2599%25A8%25E5%25AD%25A6%25E4%25B9%25A0/][为什么 spark 有时候不适合大规模机器学习]]
+2. [[https://thenewstack.io/the-good-bad-and-ugly-apache-spark-for-data-science-work/][The Good, Badn and Ugly: Apache Spark for Data Science Work]]
